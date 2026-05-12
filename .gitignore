@@ -1,0 +1,22 @@
+# Maven build output
+/target/
+*.class
+
+# Local benchmark input/output data
+/csv/
+/data/*
+!/data/.gitkeep
+/log_file*.txt
+/perf_file*.csv
+/scale_file*.csv
+
+# H2 database files
+*.mv.db
+*.lock.db
+*.trace.db
+
+# Local IDE/system files
+/.idea/
+*.iml
+.DS_Store
+Thumbs.db
