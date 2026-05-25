@@ -6,7 +6,7 @@
 -- 2) PostGIS geometry columns are represented as H2GIS GEOMETRY.
 -- 3) WKT geometry from CSV is loaded with ST_GeomFromText(..., 4326).
 -- 4) PostgreSQL SERIAL / sequences are approximated with H2 SEQUENCE + DEFAULT NEXT VALUE.
--- 5) PostgreSQL planner/index behavior is not identical; indexes below preserve intent, not exact optimizer behavior.
+-- 5) PostgreSQL GiST spatial indexes are approximated with H2GIS spatial indexes.
 --
 -- CSV assumptions:
 -- 1) CSV files are in ./csv/ relative to Java working directory.
@@ -369,41 +369,14 @@ SELECT
 FROM CSVREAD('./csv/tripzones_polygons6.csv');
 
 -- ==============================
--- Indexes for PostGIS-like usage
+-- Indexes matching the PostgreSQL dump
 -- ==============================
--- Spatial indexes correspond to PostGIS GiST/R-tree intent.
--- B-tree indexes below preserve typical PostgreSQL workload indexes / join-path intent.
+-- Spatial indexes correspond to the PostGIS GiST indexes in dump.sql.
 
-CREATE SPATIAL INDEX dimsmarine_rtree_idx ON dimsmarine(m_geom);
-CREATE SPATIAL INDEX dimsport_rtree_idx ON dimsport(p_geom);
+CREATE SPATIAL INDEX dimmarine_rtree_idx ON dimsmarine(m_geom);
 CREATE SPATIAL INDEX trippoints_rtree_idx ON trippoints(tp_geopoint);
 CREATE SPATIAL INDEX tripzones_rtree_idx5 ON tripzones_polygons5(tz_zone_polygon);
 CREATE SPATIAL INDEX tripzones_rtree_idx6 ON tripzones_polygons6(tz_zone_polygon);
-
-CREATE INDEX dimsmarine_id_idx ON dimsmarine(m_id);
-CREATE INDEX dimsport_id_idx ON dimsport(p_id);
-CREATE INDEX dimsport_name_country_idx ON dimsport(p_name, p_country);
-
-CREATE INDEX trips_trip_sk_idx ON trips(t_trip_sk);
-CREATE INDEX trips_vessel_idx ON trips(t_vessel);
-CREATE INDEX trips_departure_port_idx ON trips(t_departure_port);
-CREATE INDEX trips_arrival_port_idx ON trips(t_arrival_port);
-CREATE INDEX trips_ports_idx ON trips(t_departure_port, t_arrival_port);
-
-CREATE INDEX trippoints_trip_idx ON trippoints(tp_trip_sk);
-CREATE INDEX trippoints_trip_offset_idx ON trippoints(tp_trip_sk, tp_point_offset);
-CREATE INDEX trippoints_time_idx ON trippoints(tp_time);
-CREATE INDEX trippoints_date_time_idx ON trippoints(tp_date, tp_time);
-
-CREATE INDEX tripzones5_trip_idx ON tripzones_polygons5(tz_trip_sk);
-CREATE INDEX tripzones5_trip_zone_idx ON tripzones_polygons5(tz_trip_sk, tz_zone_number);
-CREATE INDEX tripzones5_time_idx ON tripzones_polygons5(tz_entrance_time, tz_quit_time);
-CREATE INDEX tripzones5_quit_dt_idx ON tripzones_polygons5(tz_quit_date, tz_quit_time);
-
-CREATE INDEX tripzones6_trip_idx ON tripzones_polygons6(tz_trip_sk);
-CREATE INDEX tripzones6_trip_zone_idx ON tripzones_polygons6(tz_trip_sk, tz_zone_number);
-CREATE INDEX tripzones6_time_idx ON tripzones_polygons6(tz_entrance_time, tz_quit_time);
-CREATE INDEX tripzones6_quit_dt_idx ON tripzones_polygons6(tz_quit_date, tz_quit_time);
 
 -- ==============================
 -- Optional row-count check

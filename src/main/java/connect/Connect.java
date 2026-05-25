@@ -57,10 +57,25 @@ public class Connect {
     static List<Integer> one_to_four = Arrays.asList(1, 2, 3, 4);
     static List<Integer> five = Arrays.asList(5);
 
+    private static final String[] BATCH_PATTERNS = {
+            "all",
+            "SpatialJoin_Group_NumAgg",
+            "SpatialJoin_Group_SpatialAgg",
+            "SpatialJoin_NoGroup_NoAgg",
+            "SpatialJoin_NoGroup_NumAgg",
+            "SpatialJoin_NoGroup_SpatialAgg",
+            "EquiJoin_Group_NumAgg",
+            "EquiJoin_Group_SpatialAgg",
+            "EquiJoin_NoGroup_NoAgg",
+            "EquiJoin_NoGroup_NumAgg",
+            "EquiJoin_NoGroup_SpatialAgg",
+            "NoJoin_NoGroup_NumAgg",
+            "NoJoin_NoGroup_SpatialAgg"
+    };
+
     public static void main(String[] args) {
         boolean numerical_veracity = true; // or distance_veracity
         boolean logging_to_file = true;
-        boolean equijoin_workload = true;
         boolean database_1month = false;
 
         // Keep this false for final benchmarks.
@@ -69,7 +84,9 @@ public class Connect {
 
         String workload = "", database = "";
         try {
-            if (equijoin_workload) workload = "_equijoin"; else workload = "_spatial";
+            RunOptions options = parseRunOptions(args);
+            String selectedBatch = getSelectedBatch(options.batchNumber);
+            workload = getWorkloadSuffix(options.batchNumber);
             if (database_1month) database = "_1month"; else database = "_1day";
             load_property_files();
 
@@ -85,16 +102,18 @@ public class Connect {
 
             // Do NOT append database name or ?socketTimeout=0 here.
             // H2 connection options are already in db above.
-            conn = DriverManager.getConnection(db, user, pwd);
+            String dbUrl = options.dbUrl != null ? options.dbUrl : db;
+            String initDbUrl = toInitH2Url(dbUrl);
+            conn = DriverManager.getConnection(initDbUrl, user, pwd);
 
             System.out.println("connected");
-            stmt = conn.createStatement();
-
-            // Load H2GIS functions into this H2 connection.
-            stmt.execute("CREATE ALIAS IF NOT EXISTS H2GIS_SPATIAL FOR \"org.h2gis.functions.factory.H2GISFunctions.load\";");
-            stmt.execute("CALL H2GIS_SPATIAL();");
-            System.out.println("H2GIS spatial functions loaded");
+            System.out.println("Database URL: " + initDbUrl);
             System.out.println("Working directory: " + System.getProperty("user.dir"));
+            System.out.println("Initializing fresh H2GIS database");
+            InitH2GIS.initialize(conn, InitH2GIS.sqlScript);
+
+            stmt = conn.createStatement();
+            System.out.println("Selected batch: " + options.batchNumber + " (" + BATCH_PATTERNS[options.batchNumber] + ")");
 
             int nbr_series = point_queries_ids.size();
             String[] patterns;
@@ -110,10 +129,14 @@ public class Connect {
                 three_patterns = String.join("_", patterns[0], patterns[1], patterns[2]);
                 System.out.println("PATTERN 5 PREFIX: " + five_patterns);
 
+                if (selectedBatch != null && !three_patterns.equals(selectedBatch)) {
+                    continue;
+                }
+
                 if (!ignore.contains(five_patterns)) {
 
-                    if ((three_patterns.equals("SpatialJoin_Group_NumAgg") && !equijoin_workload)
-                            || (three_patterns.equals("SpatialJoin_Group_SpatialAgg") && !equijoin_workload)) {
+                    if (three_patterns.equals("SpatialJoin_Group_NumAgg")
+                            || three_patterns.equals("SpatialJoin_Group_SpatialAgg")) {
                         executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
                                 shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
                                 shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
@@ -124,7 +147,7 @@ public class Connect {
                                 two,
                                 numerical_veracity,
                                 verboseRows);
-                    } else if (three_patterns.equals("EquiJoin_Group_SpatialAgg") && equijoin_workload) {
+                    } else if (three_patterns.equals("EquiJoin_Group_SpatialAgg")) {
                         executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
                                 shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
                                 shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
@@ -135,11 +158,11 @@ public class Connect {
                                 five,
                                 numerical_veracity,
                                 verboseRows);
-                    } else if ((three_patterns.equals("SpatialJoin_NoGroup_NumAgg") && !equijoin_workload)
-                            || (three_patterns.equals("EquiJoin_NoGroup_NumAgg") && equijoin_workload)
-                            || (three_patterns.equals("EquiJoin_NoGroup_SpatialAgg") && equijoin_workload)
-                            || (three_patterns.equals("NoJoin_NoGroup_SpatialAgg") && !equijoin_workload)
-                            || (three_patterns.equals("SpatialJoin_NoGroup_SpatialAgg") && !equijoin_workload)) {
+                    } else if (three_patterns.equals("SpatialJoin_NoGroup_NumAgg")
+                            || three_patterns.equals("EquiJoin_NoGroup_NumAgg")
+                            || three_patterns.equals("EquiJoin_NoGroup_SpatialAgg")
+                            || three_patterns.equals("NoJoin_NoGroup_SpatialAgg")
+                            || three_patterns.equals("SpatialJoin_NoGroup_SpatialAgg")) {
                         executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
                                 shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
                                 shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
@@ -150,7 +173,7 @@ public class Connect {
                                 one,
                                 numerical_veracity,
                                 verboseRows);
-                    } else if (three_patterns.equals("NoJoin_NoGroup_NumAgg") && !equijoin_workload) {
+                    } else if (three_patterns.equals("NoJoin_NoGroup_NumAgg")) {
                         executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
                                 shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
                                 shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
@@ -161,7 +184,7 @@ public class Connect {
                                 one_two,
                                 numerical_veracity,
                                 verboseRows);
-                    } else if (three_patterns.equals("EquiJoin_Group_NumAgg") && equijoin_workload) {
+                    } else if (three_patterns.equals("EquiJoin_Group_NumAgg")) {
                         executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
                                 shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
                                 shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
@@ -172,8 +195,8 @@ public class Connect {
                                 two_three,
                                 numerical_veracity,
                                 verboseRows);
-                    } else if ((three_patterns.equals("SpatialJoin_NoGroup_NoAgg") && !equijoin_workload)
-                            || (three_patterns.equals("EquiJoin_NoGroup_NoAgg") && equijoin_workload)) {
+                    } else if (three_patterns.equals("SpatialJoin_NoGroup_NoAgg")
+                            || three_patterns.equals("EquiJoin_NoGroup_NoAgg")) {
                         executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
                                 shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
                                 shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
@@ -215,6 +238,69 @@ public class Connect {
                 log_file.close();
             }
         }
+    }
+
+    private static RunOptions parseRunOptions(String[] args) {
+        RunOptions options = new RunOptions();
+        options.batchNumber = 0;
+
+        for (String arg : args) {
+            if (arg == null || arg.trim().isEmpty()) {
+                continue;
+            }
+            String trimmed = arg.trim();
+            if (isInteger(trimmed)) {
+                int batchNumber = Integer.parseInt(trimmed);
+                if (batchNumber < 0 || batchNumber >= BATCH_PATTERNS.length) {
+                    throw new IllegalArgumentException("Batch number must be between 0 and 12. Got: " + trimmed);
+                }
+                options.batchNumber = batchNumber;
+            } else {
+                options.dbUrl = normalizeH2Url(trimmed);
+            }
+        }
+
+        return options;
+    }
+
+    private static boolean isInteger(String value) {
+        try {
+            Integer.parseInt(value);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static String normalizeH2Url(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return db;
+        }
+        String trimmed = value.trim();
+        if (trimmed.startsWith("jdbc:h2:")) {
+            return trimmed;
+        }
+        return "jdbc:h2:" + trimmed;
+    }
+
+    private static String toInitH2Url(String dbUrl) {
+        return dbUrl.replaceAll("(?i);IFEXISTS=TRUE", "");
+    }
+
+    private static class RunOptions {
+        int batchNumber;
+        String dbUrl;
+    }
+
+    private static String getSelectedBatch(int batchNumber) {
+        return batchNumber == 0 ? null : BATCH_PATTERNS[batchNumber];
+    }
+
+    private static String getWorkloadSuffix(int batchNumber) {
+        if (batchNumber == 0) {
+            return "_all";
+        }
+        return "_batch" + String.format("%02d", batchNumber) + "_" + BATCH_PATTERNS[batchNumber];
     }
 
     public static void load_property_files() {
