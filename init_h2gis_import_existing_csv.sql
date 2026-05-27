@@ -369,7 +369,7 @@ SELECT
 FROM CSVREAD('./csv/tripzones_polygons6.csv');
 
 -- ==============================
--- Indexes matching the PostgreSQL dump
+-- Spatial indexes matching the PostgreSQL dump
 -- ==============================
 -- Spatial indexes correspond to the PostGIS GiST indexes in dump.sql.
 
@@ -377,6 +377,35 @@ CREATE SPATIAL INDEX dimmarine_rtree_idx ON dimsmarine(m_geom);
 CREATE SPATIAL INDEX trippoints_rtree_idx ON trippoints(tp_geopoint);
 CREATE SPATIAL INDEX tripzones_rtree_idx5 ON tripzones_polygons5(tz_zone_polygon);
 CREATE SPATIAL INDEX tripzones_rtree_idx6 ON tripzones_polygons6(tz_zone_polygon);
+
+-- ==============================
+-- Relational indexes for optimized benchmark runs
+-- ==============================
+-- These indexes support the equi-join, filter, and self-join patterns used
+-- especially by batches 6, 7, 9, and 10. They are not present in dump.sql;
+-- use this setup as an indexed/tuned benchmark variant.
+
+CREATE INDEX idx_trippoints_trip_sk ON trippoints(tp_trip_sk);
+CREATE INDEX idx_trippoints_time_trip ON trippoints(tp_time, tp_trip_sk);
+CREATE INDEX idx_trippoints_trip_offset ON trippoints(tp_trip_sk, tp_point_offset);
+
+CREATE INDEX idx_trips_trip_sk ON trips(t_trip_sk);
+CREATE INDEX idx_trips_vessel ON trips(t_vessel);
+CREATE INDEX idx_trips_departure_port ON trips(t_departure_port);
+CREATE INDEX idx_trips_arrival_port ON trips(t_arrival_port);
+CREATE INDEX idx_trips_departure_arrival ON trips(t_departure_port, t_arrival_port);
+
+CREATE INDEX idx_dimsport_id ON dimsport(p_id);
+
+CREATE INDEX idx_tripzones5_trip_sk ON tripzones_polygons5(tz_trip_sk);
+CREATE INDEX idx_tripzones5_trip_zone ON tripzones_polygons5(tz_trip_sk, tz_zone_number);
+CREATE INDEX idx_tripzones5_time_trip_zone ON tripzones_polygons5(tz_entrance_time, tz_quit_time, tz_trip_sk, tz_zone_number);
+
+CREATE INDEX idx_tripzones6_trip_sk ON tripzones_polygons6(tz_trip_sk);
+CREATE INDEX idx_tripzones6_trip_zone ON tripzones_polygons6(tz_trip_sk, tz_zone_number);
+CREATE INDEX idx_tripzones6_time_trip_zone ON tripzones_polygons6(tz_entrance_time, tz_quit_time, tz_trip_sk, tz_zone_number);
+
+ANALYZE;
 
 -- ==============================
 -- Optional row-count check

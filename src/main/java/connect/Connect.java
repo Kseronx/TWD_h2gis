@@ -31,6 +31,7 @@ public class Connect {
     // The database file path must match InitH2GIS/import script.
     // It opens ./data/vesselstraj.mv.db relative to the working directory.
     public static String db = "jdbc:h2:./data/vesselstraj;AUTO_SERVER=TRUE;LOCK_TIMEOUT=600000;IFEXISTS=TRUE";
+    public static String memoryDb = "jdbc:h2:mem:vesselstraj;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=600000";
     public static String user = "sa";
     public static String pwd = "";
 
@@ -86,7 +87,7 @@ public class Connect {
         try {
             RunOptions options = parseRunOptions(args);
             String selectedBatch = getSelectedBatch(options.batchNumber);
-            workload = getWorkloadSuffix(options.batchNumber);
+            workload = getWorkloadSuffix(options.batchNumber) + "_" + options.storageMode;
             if (database_1month) database = "_1month"; else database = "_1day";
             load_property_files();
 
@@ -102,11 +103,12 @@ public class Connect {
 
             // Do NOT append database name or ?socketTimeout=0 here.
             // H2 connection options are already in db above.
-            String dbUrl = options.dbUrl != null ? options.dbUrl : db;
+            String dbUrl = options.dbUrl != null ? options.dbUrl : getDefaultDbUrl(options.storageMode);
             String initDbUrl = toInitH2Url(dbUrl);
             conn = DriverManager.getConnection(initDbUrl, user, pwd);
 
             System.out.println("connected");
+            System.out.println("Storage mode: " + options.storageMode);
             System.out.println("Database URL: " + initDbUrl);
             System.out.println("Working directory: " + System.getProperty("user.dir"));
             System.out.println("Initializing fresh H2GIS database");
@@ -243,24 +245,44 @@ public class Connect {
     private static RunOptions parseRunOptions(String[] args) {
         RunOptions options = new RunOptions();
         options.batchNumber = 0;
+        options.storageMode = "file";
 
-        for (String arg : args) {
-            if (arg == null || arg.trim().isEmpty()) {
-                continue;
+        if (args.length >= 1 && args[0] != null && !args[0].trim().isEmpty()) {
+            String batchArg = args[0].trim();
+            if (!isInteger(batchArg)) {
+                throw new IllegalArgumentException("First argument must be a batch number between 0 and 12. Got: " + batchArg);
             }
-            String trimmed = arg.trim();
-            if (isInteger(trimmed)) {
-                int batchNumber = Integer.parseInt(trimmed);
-                if (batchNumber < 0 || batchNumber >= BATCH_PATTERNS.length) {
-                    throw new IllegalArgumentException("Batch number must be between 0 and 12. Got: " + trimmed);
-                }
-                options.batchNumber = batchNumber;
-            } else {
-                options.dbUrl = normalizeH2Url(trimmed);
+            int batchNumber = Integer.parseInt(batchArg);
+            if (batchNumber < 0 || batchNumber >= BATCH_PATTERNS.length) {
+                throw new IllegalArgumentException("Batch number must be between 0 and 12. Got: " + batchArg);
             }
+            options.batchNumber = batchNumber;
+        }
+
+        if (args.length >= 2 && args[1] != null && !args[1].trim().isEmpty()) {
+            options.storageMode = normalizeStorageMode(args[1].trim());
+        }
+
+        if (args.length >= 3 && args[2] != null && !args[2].trim().isEmpty()) {
+            options.dbUrl = normalizeH2Url(args[2].trim());
+        }
+
+        if (args.length > 3) {
+            throw new IllegalArgumentException("Usage: Connect [batch_number] [file|memory] [jdbc_h2_url]");
         }
 
         return options;
+    }
+
+    private static String normalizeStorageMode(String value) {
+        String lower = value.toLowerCase();
+        if (lower.equals("file")) {
+            return "file";
+        }
+        if (lower.equals("memory") || lower.equals("mem") || lower.equals("in-memory") || lower.equals("inmemory")) {
+            return "memory";
+        }
+        throw new IllegalArgumentException("Second argument must be file or memory. Got: " + value);
     }
 
     private static boolean isInteger(String value) {
@@ -283,12 +305,17 @@ public class Connect {
         return "jdbc:h2:" + trimmed;
     }
 
+    private static String getDefaultDbUrl(String storageMode) {
+        return storageMode.equals("memory") ? memoryDb : db;
+    }
+
     private static String toInitH2Url(String dbUrl) {
         return dbUrl.replaceAll("(?i);IFEXISTS=TRUE", "");
     }
 
     private static class RunOptions {
         int batchNumber;
+        String storageMode;
         String dbUrl;
     }
 
