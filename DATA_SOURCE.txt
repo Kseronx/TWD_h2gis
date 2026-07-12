@@ -1,0 +1,18 @@
+Source data for this benchmark
+
+The CSV source dataset used by the H2GIS benchmark implementation is stored externally on Google Drive:
+
+https://drive.google.com/drive/folders/1heUGNfka2ZXR4klVWUm09wyobPu6yobE?usp=sharing
+
+Download the files and place them in the ./csv/ directory before building or running the benchmark.
+
+Required files:
+dimdate.csv
+dimsmarine.csv
+dimsport.csv
+dimtime.csv
+dimvessel.csv
+trippoints.csv
+trips.csv
+tripzones_polygons5.csv
+tripzones_polygons6.csv
