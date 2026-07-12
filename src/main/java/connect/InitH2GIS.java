@@ -44,7 +44,6 @@ public class InitH2GIS {
         }
 
         RunScript.execute(conn, new FileReader(scriptPath));
-        //RunScript.execute(conn, new FileReader("add_h2gis_benchmark_indexes_optional.sql"));
         System.out.println(scriptPath + " executed successfully");
     }
 }

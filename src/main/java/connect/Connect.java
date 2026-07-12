@@ -16,10 +16,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 import main.java.perf.Performance;
 import main.java.veracity.ResultsetVeracity;
@@ -28,8 +26,6 @@ public class Connect {
 
     public static String JDBC_DRIVER = "org.h2.Driver";
 
-    // The database file path must match InitH2GIS/import script.
-    // It opens ./data/vesselstraj.mv.db relative to the working directory.
     public static String db = "jdbc:h2:./data/vesselstraj;AUTO_SERVER=TRUE;LOCK_TIMEOUT=600000;IFEXISTS=TRUE";
     public static String memoryDb = "jdbc:h2:mem:vesselstraj;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=600000";
     public static String user = "sa";
@@ -47,8 +43,6 @@ public class Connect {
     static FileWriter perf_file;
     static FileWriter scale_file;
     static PrintStream log_file;
-    static public ArrayList<Performance> workloads_perf = new ArrayList<Performance>();
-
     static List<Integer> empty = Arrays.asList();
     static List<Integer> one = Arrays.asList(1);
     static List<Integer> two = Arrays.asList(2);
@@ -75,13 +69,9 @@ public class Connect {
     };
 
     public static void main(String[] args) {
-        boolean numerical_veracity = true; // or distance_veracity
+        boolean numerical_veracity = true;
         boolean logging_to_file = true;
         boolean database_1month = false;
-
-        // Keep this false for final benchmarks.
-        // Set true only when debugging very large outputs, because printing every row can be very slow.
-        boolean verboseRows = false;
 
         String workload = "", database = "";
         try {
@@ -101,8 +91,6 @@ public class Connect {
 
             Class.forName(JDBC_DRIVER);
 
-            // Do NOT append database name or ?socketTimeout=0 here.
-            // H2 connection options are already in db above.
             String dbUrl = options.dbUrl != null ? options.dbUrl : getDefaultDbUrl(options.storageMode);
             String initDbUrl = toInitH2Url(dbUrl);
             conn = DriverManager.getConnection(initDbUrl, user, pwd);
@@ -121,8 +109,6 @@ public class Connect {
             String[] patterns;
             String five_patterns, three_patterns;
 
-            Set<String> ignore = new HashSet<String>();
-
             for (int i = 0; i < nbr_series; i++) {
                 System.out.println("Serie: " + i + " on: " + nbr_series);
                 patterns = point_queries_ids.get(i).split("_");
@@ -135,84 +121,60 @@ public class Connect {
                     continue;
                 }
 
-                if (!ignore.contains(five_patterns)) {
-
-                    if (three_patterns.equals("SpatialJoin_Group_NumAgg")
-                            || three_patterns.equals("SpatialJoin_Group_SpatialAgg")) {
-                        executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
-                                shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
-                                shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
-                                "",
-                                "",
-                                five_patterns,
-                                one,
-                                two,
-                                numerical_veracity,
-                                verboseRows);
-                    } else if (three_patterns.equals("EquiJoin_Group_SpatialAgg")) {
-                        executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
-                                shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
-                                shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
-                                "",
-                                "",
-                                five_patterns,
-                                one_to_four,
-                                five,
-                                numerical_veracity,
-                                verboseRows);
-                    } else if (three_patterns.equals("SpatialJoin_NoGroup_NumAgg")
-                            || three_patterns.equals("EquiJoin_NoGroup_NumAgg")
-                            || three_patterns.equals("EquiJoin_NoGroup_SpatialAgg")
-                            || three_patterns.equals("NoJoin_NoGroup_SpatialAgg")
-                            || three_patterns.equals("SpatialJoin_NoGroup_SpatialAgg")) {
-                        executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
-                                shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
-                                shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
-                                "",
-                                "",
-                                five_patterns,
-                                empty,
-                                one,
-                                numerical_veracity,
-                                verboseRows);
-                    } else if (three_patterns.equals("NoJoin_NoGroup_NumAgg")) {
-                        executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
-                                shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
-                                shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
-                                "",
-                                "",
-                                five_patterns,
-                                empty,
-                                one_two,
-                                numerical_veracity,
-                                verboseRows);
-                    } else if (three_patterns.equals("EquiJoin_Group_NumAgg")) {
-                        executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
-                                shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
-                                shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
-                                "",
-                                "",
-                                five_patterns,
-                                one,
-                                two_three,
-                                numerical_veracity,
-                                verboseRows);
-                    } else if (three_patterns.equals("SpatialJoin_NoGroup_NoAgg")
-                            || three_patterns.equals("EquiJoin_NoGroup_NoAgg")) {
-                        executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
-                                shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
-                                shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
-                                "",
-                                "",
-                                five_patterns,
-                                one, // features
-                                three_four, // measures lon lat
-                                !numerical_veracity, // false for batches 3 and 8
-                                verboseRows);
-                    }
-
-                } else {
-                    System.out.println("IGNORE " + five_patterns);
+                if (three_patterns.equals("SpatialJoin_Group_NumAgg")
+                        || three_patterns.equals("SpatialJoin_Group_SpatialAgg")) {
+                    executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
+                            shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
+                            shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
+                            five_patterns,
+                            one,
+                            two,
+                            numerical_veracity);
+                } else if (three_patterns.equals("EquiJoin_Group_SpatialAgg")) {
+                    executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
+                            shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
+                            shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
+                            five_patterns,
+                            one_to_four,
+                            five,
+                            numerical_veracity);
+                } else if (three_patterns.equals("SpatialJoin_NoGroup_NumAgg")
+                        || three_patterns.equals("EquiJoin_NoGroup_NumAgg")
+                        || three_patterns.equals("EquiJoin_NoGroup_SpatialAgg")
+                        || three_patterns.equals("NoJoin_NoGroup_SpatialAgg")
+                        || three_patterns.equals("SpatialJoin_NoGroup_SpatialAgg")) {
+                    executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
+                            shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
+                            shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
+                            five_patterns,
+                            empty,
+                            one,
+                            numerical_veracity);
+                } else if (three_patterns.equals("NoJoin_NoGroup_NumAgg")) {
+                    executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
+                            shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
+                            shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
+                            five_patterns,
+                            empty,
+                            one_two,
+                            numerical_veracity);
+                } else if (three_patterns.equals("EquiJoin_Group_NumAgg")) {
+                    executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
+                            shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
+                            shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
+                            five_patterns,
+                            one,
+                            two_three,
+                            numerical_veracity);
+                } else if (three_patterns.equals("SpatialJoin_NoGroup_NoAgg")
+                        || three_patterns.equals("EquiJoin_NoGroup_NoAgg")) {
+                    executeQuery(point_sch_workload_prop.getProperty(point_queries_ids.get(i)),
+                            shape5_sch_workload_prop.getProperty(shape5_queries_ids.get(i)),
+                            shape6_sch_workload_prop.getProperty(shape6_queries_ids.get(i)),
+                            five_patterns,
+                            one,
+                            three_four,
+                            !numerical_veracity);
                 }
             }
 
@@ -361,13 +323,10 @@ public class Connect {
     public static void executeQuery(String query_statement_point,
                                     String query_statement_shape5,
                                     String query_statement_shape6,
-                                    String query_statement_geohash5,
-                                    String query_statement_geohash6,
                                     String query_pattern,
                                     List<Integer> list_of_feature_columns,
                                     List<Integer> list_of_target_columns,
-                                    boolean numerical_veracity,
-                                    boolean verboseRows) {
+                                    boolean numerical_veracity) {
 
         long start, finish;
         long time_elapsed_point, time_elapsed_shape5, time_elapsed_shape6;
@@ -376,7 +335,6 @@ public class Connect {
 
         System.out.println("Query pattern: " + query_pattern);
         try {
-            // -------- Point
             System.out.println("RUN " + query_statement_point);
             start = System.currentTimeMillis();
             ResultSet rs_point = stmt.executeQuery(query_statement_point);
@@ -385,14 +343,11 @@ public class Connect {
             query_perf = new Performance(query_pattern, "point", time_elapsed_point, null);
             perf_file.write(query_perf.toCSV() + "\n");
             perf_file.flush();
-            workloads_perf.add(query_perf);
 
             HashMap<String, List<Object>> point_rs_map = resultSetToMap(rs_point,
                     list_of_feature_columns,
-                    list_of_target_columns,
-                    verboseRows);
+                    list_of_target_columns);
 
-            // -------- Shape 5
             System.out.println("RUN " + query_statement_shape5);
             start = System.currentTimeMillis();
             ResultSet rs_shape = stmt.executeQuery(query_statement_shape5);
@@ -401,17 +356,14 @@ public class Connect {
 
             HashMap<String, List<Object>> shape_rs_map = resultSetToMap(rs_shape,
                     list_of_feature_columns,
-                    list_of_target_columns,
-                    verboseRows);
+                    list_of_target_columns);
             rv = new ResultsetVeracity();
-            rv.compute_metrics(point_rs_map, shape_rs_map, list_of_feature_columns, list_of_target_columns, numerical_veracity);
+            rv.compute_metrics(point_rs_map, shape_rs_map, list_of_target_columns, numerical_veracity);
 
             query_perf = new Performance(query_pattern, "shape5", time_elapsed_shape5, rv);
             perf_file.write(query_perf.toCSV() + "\n");
             perf_file.flush();
-            workloads_perf.add(query_perf);
 
-            // -------- Shape 6
             System.out.println("RUN " + query_statement_shape6);
             start = System.currentTimeMillis();
             rs_shape = stmt.executeQuery(query_statement_shape6);
@@ -420,17 +372,14 @@ public class Connect {
 
             shape_rs_map = resultSetToMap(rs_shape,
                     list_of_feature_columns,
-                    list_of_target_columns,
-                    verboseRows);
+                    list_of_target_columns);
             rv = new ResultsetVeracity();
-            rv.compute_metrics(point_rs_map, shape_rs_map, list_of_feature_columns, list_of_target_columns, numerical_veracity);
+            rv.compute_metrics(point_rs_map, shape_rs_map, list_of_target_columns, numerical_veracity);
 
             query_perf = new Performance(query_pattern, "shape6", time_elapsed_shape6, rv);
             perf_file.write(query_perf.toCSV() + "\n");
             perf_file.flush();
-            workloads_perf.add(query_perf);
 
-            // Same formulas as the original PostgreSQL runner.
             scale_file.write(query_pattern + "," +
                     (double) time_elapsed_point / time_elapsed_shape5 + "," +
                     (double) time_elapsed_point / time_elapsed_shape6 + "," +
@@ -451,20 +400,9 @@ public class Connect {
         }
     }
 
-    public static double distance_Between_LatLong(double lat1, double lon1, double lat2, double lon2) {
-        lat1 = Math.toRadians(lat1);
-        lon1 = Math.toRadians(lon1);
-        lat2 = Math.toRadians(lat2);
-        lon2 = Math.toRadians(lon2);
-        double earthRadius = 6371.01;
-        return earthRadius * Math.acos(Math.sin(lat1) * Math.sin(lat2)
-                + Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon1 - lon2));
-    }
-
     public static HashMap<String, List<Object>> resultSetToMap(ResultSet rs,
-                                                               List<Integer> list_of_feature_columns,
-                                                               List<Integer> list_of_target_columns,
-                                                               boolean verboseRows) throws SQLException {
+                                                                List<Integer> list_of_feature_columns,
+                                                                List<Integer> list_of_target_columns) throws SQLException {
 
         HashMap<String, List<Object>> map = new HashMap<>();
         List<Object> list_of_values;
@@ -482,9 +420,6 @@ public class Connect {
                     }
                 }
                 map.put(key, list_of_values);
-                if (verboseRows) {
-                    //System.out.println("key \t" + key + "\tvalue \t" + list_of_values);
-                }
             }
         } else {
             while (rs.next()) {
@@ -498,9 +433,6 @@ public class Connect {
                     }
                 }
                 map.put(key, list_of_values);
-                if (verboseRows) {
-                   // System.out.println("key \t" + key + "\tvalue \t" + list_of_values);
-                }
             }
         }
         return map;
