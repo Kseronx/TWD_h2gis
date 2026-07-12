@@ -11,10 +11,7 @@ The project is a Java/Maven benchmark client. Each benchmark run creates a fresh
 | `pom.xml` | Maven project file. Builds the executable JAR with dependencies. |
 | `src/main/java/connect/Connect.java` | Main benchmark runner. Parses runtime options, initializes the database, executes query batches, and writes results. |
 | `src/main/java/connect/InitH2GIS.java` | H2GIS initialization utility. Loads spatial functions and executes the SQL import script. |
-| `init_h2gis_import_existing_csv.sql` | H2GIS schema, CSV import logic, spatial indexes, and supporting B-tree indexes. |
-| `schema_h2gis.sql` | Standalone H2GIS schema file retained for reference. |
-| `add_h2gis_indexes.sql` | Additional benchmark-oriented indexes. |
-| `add_h2gis_benchmark_indexes_optional.sql` | Optional index script retained for experimental runs. |
+| `init_h2gis_import_existing_csv.sql` | The SQL script actually used by the benchmark. It creates the H2GIS schema, imports CSV files, loads spatial support, and creates indexes. |
 | `point_sch_workload.properties` | Workload SQL for exact point trajectories. |
 | `shape5_sch_workload.properties` | Workload SQL for the `shape5` polygon approximation. |
 | `shape6_sch_workload.properties` | Workload SQL for the `shape6` polygon approximation. |
@@ -67,6 +64,18 @@ csv/
 ```
 
 The CSV files must contain header rows matching the column names used in `init_h2gis_import_existing_csv.sql`. Geometry columns must be stored as WKT strings, for example `POINT(...)`, `POLYGON(...)`, or `MULTIPOLYGON(...)`. WKT values containing commas must be quoted in CSV.
+
+## SQL File Used By The Benchmark
+
+The active H2GIS benchmark flow uses one SQL file:
+
+```text
+init_h2gis_import_existing_csv.sql
+```
+
+This file is referenced by `InitH2GIS.sqlScript` and executed automatically by `Connect` before each benchmark run. It is also the SQL file copied by `run_obl_h2gis.sh` for SLURM execution.
+
+The benchmark does not require a separate manual schema-creation or index-creation step. H2GIS function loading, database object creation, CSV import, spatial indexes, and relational indexes are handled by this script during initialization.
 
 ## Installation
 
